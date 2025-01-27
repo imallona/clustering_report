@@ -15,7 +15,10 @@ params:
   seed: 665
 ---
 
-This version globs results instead of getting them from a `metrics file` or arguments. Due to the active development of [PR 45](https://github.com/omnibenchmark/omnibenchmark/pull/45).
+Caution this is a draft, not pretty!
+
+This version globs results instead of getting them from a `metrics file` or arguments. Due to the active development of [PR 45](https://github.com/omnibenchmark/omnibenchmark/pull/45) and [PR 52](https://github.com/omnibenchmark/omnibenchmark/pull/52).
+
 
 ```{r}
 library(argparse)
@@ -34,6 +37,8 @@ parser$add_argument('--input_dir',
                     help='path to the `out` omnibenchmark results folder')
 
 args <- parser$parse_args()
+
+## args <- list(input_dir = '/home/imallona/src/clustering_example/out')
 ```
 
 ## Clustbench metrics
@@ -121,8 +126,8 @@ To plot the data we tabulate them first:
 ## slot 2: next, typically method
 ## slot 3: typically metric
 prettify_run <- function(x, slot) {
-    ## 1 would be the stage and ## 3 the param_x encoding, so discarded
-    return(paste(x$run[[slot]][2], x$run[[slot]][4]))
+    ## 1 would be the stage, #2 the module name and ## 3 the param_x encoding, so discarding most
+    return(gsub(',', '\n', x$run[[slot]][4]))
 }
 
 
@@ -131,18 +136,18 @@ fd <- do.call(rbind.data.frame,
                   run_fd <- data.frame(metric = prettify_run(x, 3),
                                        method = prettify_run(x, 2),
                                        data =   prettify_run(x, 1))
-                  fd <- cbind(run_fd, x$metrics)
+                  fd <- cbind(run_fd, unname(x$metrics))
                   return(fd)
               })
               )
 fd$file <- rownames(fd)
 rownames(fd) <- 1:nrow(fd)
 colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', 'file')
-
+dim(fd)
 ```
 
 
-```{r, fig.width = 10, fig.height = 4}
+```{r, fig.width = 20, fig.height = 15}
 summary(fd)
 
 pivot_longer(
@@ -151,7 +156,8 @@ pivot_longer(
     names_to = 'ks') %>%
     ggplot(aes(x=ks, y= value, color = method)) +
     geom_point() +
-    facet_grid(data~metric)
+    facet_grid(metric~data) +
+    theme_bw()
 ```
 
 ## Resources
