@@ -24,6 +24,7 @@ This version globs results instead of getting them from a `metrics file` or argu
 library(argparse)
 library(ggplot2)
 library(tidyr)
+library(ComplexHeatmap)
 
 ```
 
@@ -146,6 +147,10 @@ colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', '
 dim(fd)
 ```
 
+```{r}
+write.csv(fd, file = 'fd.csv')
+```
+
 
 ```{r, fig.width = 20, fig.height = 15}
 summary(fd)
@@ -158,6 +163,22 @@ pivot_longer(
     geom_point() +
     facet_grid(metric~data) +
     theme_bw()
+```
+
+```{r, fig.width = 30, fig.height = 30, eval = FALSE}
+
+fd <- fd[order(fd$k,fd$method, fd$metric, fd$data),]
+mat <- fd[,c('k-2', 'k-1', 'k', 'k+1', 'k+2')]
+
+row_ha = rowAnnotation(metric = fd$metric,
+                       method = fd$method,
+                       data = fd$data)
+
+Heatmap(mat, name = "metric",  right_annotation = row_ha, cluster_rows = FALSE)
+
+
+
+
 ```
 
 ## Resources
