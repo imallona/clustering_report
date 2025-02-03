@@ -12,7 +12,8 @@ output:
     df_print: kable
     theme: lumen
 params:
-  seed: 665
+  input_dir: ''
+  out_csv: ''
 ---
 
 Caution this is a draft, not pretty!
@@ -30,16 +31,19 @@ library(ComplexHeatmap)
 
 
 ```{r}
-parser <- ArgumentParser(description="Clustering metric collector")
+## parser <- ArgumentParser(description="Clustering metric collector")
 
 
-parser$add_argument('--input_dir',
-                    type="character",
-                    help='path to the `out` omnibenchmark results folder')
+## parser$add_argument('--input_dir',
+##                     type="character",
+##                     help='path to the `out` omnibenchmark results folder')
 
-args <- parser$parse_args()
+## args <- parser$parse_args()
 
-## args <- list(input_dir = '/home/imallona/src/clustering_example/out')
+## parametrized args instead
+
+args <- list(input_dir = params$input_dir,
+             out_csv = params$out_csv)
 ```
 
 ## Clustbench metrics
@@ -148,7 +152,7 @@ dim(fd)
 ```
 
 ```{r}
-write.csv(fd, file = 'fd.csv')
+write.csv(fd, file = args$out_csv)
 ```
 
 
