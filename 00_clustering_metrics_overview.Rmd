@@ -27,6 +27,9 @@ library(ggplot2)
 library(tidyr)
 library(ComplexHeatmap)
 
+
+options(bitmapType="cairo")
+
 ```
 
 
@@ -166,7 +169,8 @@ pivot_longer(
     ggplot(aes(x=ks, y= value, color = method)) +
     geom_point() +
     facet_grid(metric~data) +
-    theme_bw()
+    theme_bw() +
+    theme(text=element_text(family="Arial",size=12))
 ```
 
 ```{r, fig.width = 30, fig.height = 30, eval = FALSE}

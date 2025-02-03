@@ -1,0 +1,185 @@
+---
+title: "Clustering benchmark metric collection: clustering metrics"
+author: "Izaskun Mallona"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 111
+---
+
+Caution this is a draft, not pretty!
+
+
+
+```{r}
+## library(argparse)
+library(ggplot2)
+library(tidyr)
+## library(ComplexHeatmap)
+
+
+options(bitmapType="cairo")
+
+```
+
+
+```{r}
+WD <- '/home/imallona/src/clustering_example'
+```
+
+
+We'll have to read both metrics and param files? e.g. direct translation of [the python implementation](https://github.com/omnibenchmark/omnibenchmark/pull/45/files#diff-61e6034e7438befed44f7303987c35f814bdfee939eb70186b48dbe2fe1182c8)?
+
+
+
+```{r}
+## def tokenize(file_path: str):
+##     ## we get only after the 'out' directory
+##     fp = file_path.split("out/")[1].split("/")
+##     ## and slice in stage/method/params triples
+##     return [x for x in zip(*(iter(fp),) * 3)]
+
+tokenize <- function(fn, out = 'out') {
+    fn <- file.path(out, fn)
+    fp = strsplit(strsplit(fn, split = 'out/')[[1]][2], split = '/')[[1]]
+    i <- 1
+    res <- list()
+    while (i < length(fp)) {
+        res[[as.character(i)]] <- fp[i:(i+2)]
+        i <- i+3
+    }
+    return(res)
+}
+
+## def read_params(file_path: str):
+##     triples = tokenize(file_path)
+##     params_path = ""
+##     res = ""
+##     parent = "out"
+##     for triple in triples:
+##         parent = op.join(parent, triple[0], triple[1], triple[2])
+##         if not "default" in triple[2]:
+##             param_file_path = op.join(parent, "parameters.txt")
+##             with open(param_file_path) as fh:
+##                 reader = csv.reader(fh, delimiter="\t")
+##                 for row in reader:
+##                     res = "%s %s %s %s %s;" % (
+##                         res,
+##                         triple[0],
+##                         triple[1],
+##                         triple[2],
+##                         row[0].strip(),
+##                     )
+
+read_params <- function(file_path, out = 'out') {
+    triples <- tokenize(file_path)    
+    params_path = ""
+    res <- list()
+    parent <- out
+    for (i in 1:length(triples)){
+        triple <- triples[[i]]
+        parent = file.path(parent, triple[1], triple[2], triple[3])
+        if (triple[3] != "default"){
+            param_file_path <- file.path(parent, "parameters.txt")
+            ## caution param files lack EOL
+            params <- readLines(param_file_path, warn = FALSE)
+            res[[i]] <- c(triple[1], triple[2], triple[3], params)
+        }
+    }
+    return(res)
+}
+```
+
+
+```{r}
+d <- list()
+
+for (backend in c('envmodules', 'singularity', 'conda')) {
+    out <- file.path(WD, paste0('out_', backend))
+    fns <- list.files(out, pattern = "*performance.txt", recursive = TRUE)
+    for (fn in fns) {
+        d[[backend]][[fn]] <- list(run = read_params(out = file.path(WD, paste0('out_', backend)), file_path = fn),
+                                   perf = read.table(file.path(WD, paste0('out_', backend), fn), header = TRUE))
+    }
+}
+
+```
+
+To plot the data we tabulate them in the ugliest and least robust way possible:
+
+```{r}
+
+names(d)
+
+harm <- list()
+for (node in names(d[[1]])) {
+    dat <- method <- metric <- 'not_available'
+    if (length(d[['envmodules']][[node]]$run) >= 2)
+        method <- paste(d[['envmodules']][[node]]$run[[2]], collapse = ' ')
+    if (length(d[['envmodules']][[node]]$run) == 3)
+        metric <- paste(d[['envmodules']][[node]]$run[[3]], collapse = ' ')
+
+    harm[[node]] <- data.frame(envmodules = as.numeric(d[['envmodules']][[node]]$perf),
+                               singularity = as.numeric(d[['singularity']][[node]]$perf),
+                               conda = as.numeric(d[['conda']][[node]]$perf),
+                               fn = node,
+                               data = paste(d[['envmodules']][[node]]$run[[1]], collapse = ' '),
+                               method = method,
+                               metrics = metric)
+}
+
+fd <- do.call(rbind.data.frame, harm)
+
+fd$performance_metric <- names(d[[1]][[1]]$perf) # let's recycle the vector again
+
+fd$is_method <- fd$method != 'not_available' & fd$metrics == 'not_available'
+
+table(fd$is_method)
+```
+
+
+```{r, fig.width = 10, fig.height = 15}
+
+
+fd <- pivot_longer(fd,
+                   cols = c('envmodules', 'singularity', 'conda'),                  
+                   names_to = 'backend',
+                   values_to = 'value')
+fd <- fd[!is.na(fd$value),]
+
+
+## fd <- fd[order(fd$value, fd$performance_metric, decreasing = TRUE),]
+
+ggplot(fd, aes(x=method, y= value, color = backend)) +
+    geom_point() +
+    facet_grid(data~performance_metric) +
+    geom_line(aes(group = fn)) +
+    scale_y_log10() +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    theme(text=element_text(family="Arial",size=12))
+
+
+ggplot(fd[fd$is_method,], aes(x=method, y= value, color = backend)) +
+    geom_point() +
+    facet_grid(performance_metric~data) +
+    geom_line(aes(group = fn)) +
+    scale_y_log10() +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    theme(text=element_text(family="Arial",size=12))
+
+```
+
+
+```{r}
+sessionInfo()
+```
