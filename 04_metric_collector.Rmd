@@ -1,0 +1,43 @@
+---
+title: "Clustering benchmark metric collection: clustering metrics"
+author: "Izaskun Mallona"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  input_files: ''
+  out_html: ''
+---
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(ComplexHeatmap)
+
+
+options(bitmapType="cairo")
+
+```
+
+
+```{r}
+
+args <- list(input_dir = params$input_dir,
+             out_csv = params$out_csv)
+
+print(args)
+```
+
+## Trace
+
+```{r}
+sessionInfo()
+```
