@@ -13,7 +13,7 @@ output:
     theme: lumen
 params:
   input_files: ''
-  out_html: ''
+  output_dir: ''
 ---
 
 
@@ -29,11 +29,11 @@ options(bitmapType="cairo")
 
 
 ```{r}
+cat(getwd())
+args <- list(input_files = params$input_files,
+             wd = params$output_dir)
 
-args <- list(input_dir = params$input_dir,
-             out_csv = params$out_csv)
-
-print(args)
+cat(str(args))
 ```
 
 ## Trace

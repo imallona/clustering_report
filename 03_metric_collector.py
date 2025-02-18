@@ -12,12 +12,20 @@ Izaskun Mallona
 import argparse
 import os.path as op
 import subprocess
+import sys
 
 def process(output_dir, metrics_metafile, report_basename):
+    """
+    So rmarkdown::render is called pointing to a Rmd script placed within (sys.path[0]) this very script dir
+    """
     subprocess.run(
-        ["Rscript", "-e", "rmarkdown::render('04_metric_collector.Rmd', \
+        ["Rscript", "-e", "rmarkdown::render('%s', \
                   param=list(input_files='%s', \
-                  out_html = '%s'))" %(metrics_metafile,  op.join(output_dir, report_basename)) ],
+                             output_dir='%s'), \
+                  output_file = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
+                                         output_dir,
+                                         metrics_metafile,
+                                        op.join(report_basename)) ],
         cwd = output_dir,
     )
     
@@ -30,13 +38,15 @@ def main():
     args, _ = parser.parse_known_args()
 
     files = getattr(args, 'metrics.scores')
-    print(files)
     output_dir = getattr(args, 'output_dir')
 
-    with open('inputs.txt', 'w') as fh:
+    with open(op.join(output_dir, 'inputs.txt'), 'w') as fh:
         fh.write("\n".join(map(str, files)))
-    
-    process(output_dir, metrics_metafile = 'inputs.txt', report_basename = 'plotting_report.html')
+
+    print(output_dir)
+    process(output_dir = output_dir,
+            metrics_metafile = op.join(output_dir, 'inputs.txt'),
+            report_basename = 'plotting_report.html')
 
 
 if __name__ == "__main__":
