@@ -155,6 +155,36 @@ write.csv(fd, file = args$out_csv)
 ```
 
 
+```{r, fig.width = 20, fig.height = 15}
+summary(fd)
+
+pivot_longer(
+    fd,
+    cols = c('k-1', 'k-2', 'k', 'k+1', 'k+2'),
+    names_to = 'ks') %>%
+    ggplot(aes(x=ks, y= value, color = method)) +
+    geom_point() +
+    facet_grid(metric~data) +
+    theme_bw() +
+    theme(text=element_text(family="Arial",size=12))
+```
+
+```{r, fig.width = 30, fig.height = 30, eval = FALSE}
+
+fd <- fd[order(fd$k,fd$method, fd$metric, fd$data),]
+mat <- fd[,c('k-2', 'k-1', 'k', 'k+1', 'k+2')]
+
+row_ha = rowAnnotation(metric = fd$metric,
+                       method = fd$method,
+                       data = fd$data)
+
+Heatmap(mat, name = "metric",  right_annotation = row_ha, cluster_rows = FALSE)
+
+
+
+
+``` 
+
 
 ## Trace
 
