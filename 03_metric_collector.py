@@ -25,10 +25,10 @@ def process(output_dir, metrics_metafile, report_basename):
                              outputs_directory='%s'), \
                   output_file = '%s', \
                   output_dir = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
-                                         metrics_metafile,
-                                         output_dir,
+                                         op.abspath(metrics_metafile),
+                                         op.abspath(op.join(output_dir)),
                                          report_basename,
-                                         '.') ],
+                                         op.abspath(output_dir)) ],
         cwd = output_dir,
     )
     
@@ -43,6 +43,7 @@ def main():
     files = getattr(args, 'metrics.scores')
     output_dir = getattr(args, 'output_dir')
 
+    files = [op.abspath(x) for x in files]
     with open(op.join(output_dir, 'inputs.txt'), 'w') as fh:
         fh.write("\n".join(map(str, files)))
 

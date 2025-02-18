@@ -30,9 +30,13 @@ options(bitmapType="cairo")
 
 ```{r}
 args <- list(input_files_mapping = params$input_files_mapping,
-             wd = params$output_dir,
-             out_csv = file.path(params$output_dir, 'metrics.csv'))
+             wd = params$outputs_directory,
+             out_csv = file.path(params$outputs_directory, 'metrics.csv'))
 
+## write(getwd(), stderr())
+## write(args$input_files_mapping, stderr())
+## write(args$wd, stderr())
+setwd(args$wd)
 ```
 
 
@@ -83,7 +87,7 @@ tokenize <- function(fn, out = 'out') {
 ##                     )
 
 read_params <- function(file_path, out = 'out') {
-    triples <- tokenize(file_path)    
+    triples <- tokenize(file_path) 
     params_path = ""
     res <- list()
     parent <- out
@@ -93,6 +97,7 @@ read_params <- function(file_path, out = 'out') {
         if (triple[3] != "default"){
             param_file_path <- file.path(parent, "parameters.txt")
             ## caution param files lack EOL
+            ## write(paste('param file is', param_file_path), stderr())
             params <- readLines(param_file_path, warn = FALSE)
             res[[i]] <- c(triple[1], triple[2], triple[3], params)
         }
@@ -109,8 +114,9 @@ d <- list()
 metrics_files <- read.table(args$input_files_mapping, header = FALSE)$V1
 
 for (fn in metrics_files){
+    ## write(paste('fn is ', fn), stderr())
     d[[fn]] <- list(
-        run = read_params(out = 'out', file_path = fn),    
+        run = read_params(out = args$wd, file_path = fn),    
         metrics = read.csv(fn, header = TRUE))
 }
 
