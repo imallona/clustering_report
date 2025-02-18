@@ -26,7 +26,7 @@ def process(output_dir, metrics_metafile, report_basename):
                   output_file = '%s', \
                   output_dir = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
                                          op.abspath(metrics_metafile),
-                                         op.abspath(op.join(output_dir)),
+                                         op.abspath(op.join(output_dir, '..')),
                                          report_basename,
                                          op.abspath(output_dir)) ],
         cwd = output_dir,
