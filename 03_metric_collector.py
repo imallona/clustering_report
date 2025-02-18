@@ -21,7 +21,7 @@ def process(output_dir, metrics_metafile, report_basename):
     """
     subprocess.run(
         ["Rscript", "-e", "rmarkdown::render('%s', \
-                  param=list(input_files='%s', \
+                  param=list(input_files_mapping='%s', \
                              outputs_directory='%s'), \
                   output_file = '%s', \
                   output_dir = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
