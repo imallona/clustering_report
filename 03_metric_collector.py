@@ -17,15 +17,18 @@ import sys
 def process(output_dir, metrics_metafile, report_basename):
     """
     So rmarkdown::render is called pointing to a Rmd script placed within (sys.path[0]) this very script dir
+    Caution the rmarkdown output directory specification is confusing: '.' propagates the 'out/{name}' path
     """
     subprocess.run(
         ["Rscript", "-e", "rmarkdown::render('%s', \
                   param=list(input_files='%s', \
-                             output_dir='%s'), \
-                  output_file = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
-                                         output_dir,
+                             outputs_directory='%s'), \
+                  output_file = '%s', \
+                  output_dir = '%s')" %(op.join(sys.path[0], '04_metric_collector.Rmd'),
                                          metrics_metafile,
-                                        op.join(report_basename)) ],
+                                         output_dir,
+                                         report_basename,
+                                         '.') ],
         cwd = output_dir,
     )
     

@@ -13,7 +13,7 @@ output:
     theme: lumen
 params:
   input_files: ''
-  output_dir: ''
+  outputs_directory: ''
 ---
 
 
