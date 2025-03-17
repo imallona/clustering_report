@@ -1,0 +1,105 @@
+---
+title: "Clustering benchmark plots"
+author: "Charlotte Soneson"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load packages
+
+```{r}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(ggplot2)
+    library(tidyr)
+})
+```
+
+# Read data
+
+```{r}
+csv <- read.csv("out_conda_metrics.csv") |>
+    dplyr::select(!contains("file")) |>
+    distinct() |> 
+    mutate(metric = sub("']", "", 
+                        sub("['--metric'\n '", "", metric, fixed = TRUE), fixed = TRUE)) |>
+    mutate(method = sub("'.*", "", sub("['--linkage'\n '", "", 
+                        sub("['--method'\n '", "", method, fixed = TRUE), 
+                        fixed = TRUE))) |>
+    mutate(datagen = sub("'.*", "", sub("['--dataset_generator'\n '", "", data, fixed = TRUE)),
+           dataname = sub("']", "", sub("'\n '", "", sub(".*--dataset_name", "", data), fixed = TRUE),
+                          fixed = TRUE)) |>
+    mutate(data = paste0(datagen, "_", dataname))
+```
+
+# Summary stats
+
+```{r}
+# Total number of distinct datasets, methods and metrics
+csv |> 
+    summarize(nDatasets = length(unique(data)),
+              nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of methods and metrics per dataset
+csv |> 
+    group_by(data) |>
+    summarize(nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of metrics and datasets for each method
+csv |> 
+    group_by(method) |>
+    summarize(nDatasets = length(unique(data)),
+              nMetrics = length(unique(metric)))
+
+```
+
+# Make plots
+
+```{r}
+#| fig.width: 10
+#| fig.height: 7
+#| warning: false
+
+csvlong <- csv |> 
+    pivot_longer(names_to = "k", values_to = "value", 
+                 c("k.2", "k.1", "k", "k.1.1", "k.2.1")) |>
+    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
+    mutate(k = factor(k, levels = c("k-2", "k-1", "k", "k+1", "k+2")))
+ggplot(csvlong |> filter(k %in% c("k-1", "k", "k+1")), aes(x = k, y = value)) + 
+    geom_line(color = "lightgrey", aes(group = paste0(method, data))) + 
+    geom_point(aes(color = data)) + 
+    geom_violin(fill = "transparent") + 
+    facet_wrap(~ metric, scales = "free_y") + 
+    theme_classic() + 
+    theme(legend.position = "none")
+
+# ggplot(csvlong |> filter(k == "k"), aes(x = data, y = value)) + 
+#     geom_line(color = "lightgrey", aes(group = method)) + 
+#     geom_point(aes(color = method)) + 
+#     geom_violin(fill = "transparent") + 
+#     facet_wrap(~ metric, scales = "free_y") + 
+#     theme_bw() + 
+#     theme(legend.position = "none")
+```
+
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+
