@@ -16,7 +16,7 @@ params:
 ---
 
 
-```{r}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 suppressPackageStartupMessages({
     library(dplyr)
     library(ggplot2)
@@ -30,8 +30,6 @@ options(bitmapType="cairo")
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 args <- list(input_files_mapping = params$input_files_mapping, wd = params$outputs_directory)
 ```
-
-# Read metrics
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -103,8 +101,6 @@ rownames(fd) <- 1:nrow(fd)
 colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', 'file')
 ```
 
-# Read data
-
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 csv <- fd |>
     dplyr::select(!contains("file")) |>
@@ -165,7 +161,7 @@ ggplot(csvlong |> filter(k %in% c("k-1", "k", "k+1")), aes(x = k, y = value)) +
 ```
 
 
-## Trace
+# Trace
 
 ```{r}
 sessionInfo()
