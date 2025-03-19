@@ -1,0 +1,241 @@
+---
+title: 'Clustering benchmark metric collection: clustering metrics'
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  apptainer_input_files_mapping: /Users/dani/Documents/omni/clustering_report/out_apptainer/inputs.txt
+  apptainer_outputs_directory: /Users/dani/Documents/omni/clustering_report/out_apptainer/out
+  conda_input_files_mapping: /Users/dani/Documents/omni/clustering_report/out_conda/inputs.txt
+  conda_outputs_directory: /Users/dani/Documents/omni/clustering_report/out_conda/out
+---
+
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(ggplot2)
+    library(tidyr)
+})
+```
+
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+args <- list(
+  conda_input = params$conda_input_files_mapping, 
+  conda_wd = params$conda_outputs_directory,
+  apptainer_input = params$apptainer_input_files_mapping, 
+  apptainer_wd = params$apptainer_outputs_directory
+)
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+tokenize <- function(fn, out = 'out') {
+    fp = strsplit(strsplit(fn, split = 'out/')[[1]][2], split = '/')[[1]]
+    i <- 1
+    res <- list()
+    while (i < length(fp)) {
+        res[[as.character(i)]] <- fp[i:(i+2)]
+        i <- i+3
+    }
+    return(res)
+}
+
+read_params <- function(file_path, out = 'out') {
+    triples <- tokenize(file_path) 
+    params_path = ""
+    res <- list()
+    parent <- out
+    for (i in 1:length(triples)){
+        triple <- triples[[i]]
+        parent = file.path(parent, triple[1], triple[2], triple[3])
+        if (triple[3] != "default"){
+            param_file_path <- file.path(parent, "parameters.txt")
+            params <- readLines(param_file_path, warn = FALSE)
+            res[[i]] <- c(triple[1], triple[2], triple[3], params)
+        }
+    }
+    return(res)
+}
+
+compile_csv <- function(input_files_mapping, wd) {
+  
+  d <- list()
+  
+  metrics_files <- read.table(input_files_mapping, header = FALSE)$V1
+  
+  for (fn in metrics_files){
+      d[[fn]] <- list(
+          run = read_params(out = wd, file_path = fn),    
+          metrics = read.csv(fn, header = TRUE)
+      )
+  }
+  
+  ## slot 1: data
+  ## slot 2: next, typically method
+  ## slot 3: typically metric
+  prettify_run <- function(x, slot) {
+    ## 1 would be the stage, #2 the module name and ## 3 the param_x encoding, so discarding most
+    return(gsub(',', '\n', x$run[[slot]][4]))
+  }
+  
+  
+  fd <- do.call(rbind.data.frame,
+                lapply(d, function(x) {
+                    run_fd <- data.frame(metric = prettify_run(x, 3),
+                                         method = prettify_run(x, 2),
+                                         data =   prettify_run(x, 1))
+                    fd <- cbind(run_fd, unname(x$metrics))
+                    return(fd)
+                })
+                )
+  fd$file <- rownames(fd)
+  rownames(fd) <- 1:nrow(fd)
+  colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', 'file')
+  
+  csv <- fd |>
+    dplyr::select(!contains("file")) |>
+    distinct() |> 
+    mutate(metric = sub("']", "", 
+                        sub("['--metric'\n '", "", metric, fixed = TRUE), fixed = TRUE)) |>
+    mutate(method = sub("'.*", "", sub("['--linkage'\n '", "", 
+                        sub("['--method'\n '", "", method, fixed = TRUE), 
+                        fixed = TRUE))) |>
+    mutate(datagen = sub("'.*", "", sub("['--dataset_generator'\n '", "", data, fixed = TRUE)),
+           dataname = sub("']", "", sub("'\n '", "", sub(".*--dataset_name", "", data), fixed = TRUE),
+                          fixed = TRUE)) |>
+    mutate(data = paste0(datagen, "_", dataname))
+  
+  return(csv)
+}
+```
+
+# Summary stats - Apptainer
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+csv_apptainer <- compile_csv(args$apptainer_input, args$apptainer_wd)
+
+csvlong_apptainer <- csv_apptainer |> 
+    pivot_longer(names_to = "k", values_to = "value", c("k-2", "k-1", "k", "k+1", "k+2")) |>
+    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
+    mutate(k = factor(k, levels = c("k-2", "k-1", "k", "k+1", "k+2")))
+
+csvlong_apptainer$stack <- 'Apptainer'
+```
+
+```{r}
+# Total number of distinct datasets, methods and metrics
+csv_apptainer |> 
+    summarize(nDatasets = length(unique(data)),
+              nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of methods and metrics per dataset
+csv_apptainer |> 
+    group_by(data) |>
+    summarize(nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of metrics and datasets for each method
+csv_apptainer |> 
+    group_by(method) |>
+    summarize(nDatasets = length(unique(data)),
+              nMetrics = length(unique(metric)))
+
+```
+
+# Summary stats - Conda
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+csv_conda <- compile_csv(args$conda_input, args$conda_wd)
+
+csvlong_conda <- csv_conda |> 
+    pivot_longer(names_to = "k", values_to = "value", c("k-2", "k-1", "k", "k+1", "k+2")) |>
+    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
+    mutate(k = factor(k, levels = c("k-2", "k-1", "k", "k+1", "k+2")))
+
+csvlong_conda$stack <- 'Conda'
+```
+
+```{r}
+# Total number of distinct datasets, methods and metrics
+csv_conda |> 
+    summarize(nDatasets = length(unique(data)),
+              nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of methods and metrics per dataset
+csv_conda |> 
+    group_by(data) |>
+    summarize(nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of metrics and datasets for each method
+csv_conda |> 
+    group_by(method) |>
+    summarize(nDatasets = length(unique(data)),
+              nMetrics = length(unique(metric)))
+
+```
+
+# Make plots
+
+```{r}
+#| fig.width: 12
+#| fig.height: 7
+#| warning: false
+
+csvlong_combined <- bind_rows(csvlong_conda, csvlong_apptainer)
+
+# One plot for combined on all datasets
+p <- ggplot(csvlong_combined |> filter(k == "k"), aes(x = stack, y = value, fill = stack)) + 
+    geom_violin(alpha = 0.4) +  # Make violins slightly transparent
+    geom_boxplot(width = 0.15, outlier.shape = NA, color = "black", alpha = 0.7) +  # Add boxplot
+    # geom_jitter(width = 0.1, size = 1.5, aes(color = stack), alpha = 0.7) +
+    # facet_grid(data ~ metric, scales = "free_y") +
+    facet_wrap(~ metric, scales = "free_y") + 
+    scale_fill_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
+    scale_color_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
+    theme_classic() +
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+  
+ggsave(filename = paste0("plots/plot_all_datasets.png"), plot = p, width = 12, height = 7, dpi = 300)
+print(p)
+
+
+# Filter unique datasets
+datasets <- unique(csvlong_combined$data)
+for (dataset in datasets) {
+  p <- ggplot(csvlong_combined |> filter(data == dataset, k == "k"), aes(x = stack, y = value, fill = stack)) + 
+    geom_violin(alpha = 0.4) +  # Make violins slightly transparent
+    geom_boxplot(width = 0.15, outlier.shape = NA, color = "black", alpha = 0.7) +  # Add boxplot
+    # geom_jitter(width = 0.1, size = 1.5, aes(color = stack), alpha = 0.7) +
+    # facet_grid(data ~ metric, scales = "free_y") +
+    facet_wrap(~ metric, scales = "free_y") + 
+    scale_fill_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
+    scale_color_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
+    theme_classic() +
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))  +  
+    ggtitle(paste("Comparison for Dataset: ", dataset))
+  
+  ggsave(filename = paste0("plots/plot_", dataset, ".png"), plot = p, width = 12, height = 7, dpi = 300)
+  print(p)
+}
+```
+
+
+# Trace
+
+```{r}
+sessionInfo()
+```
