@@ -1,7 +1,6 @@
 ---
 title: "Clustering benchmark metric collection: clustering metrics"
-author: "Izaskun Mallona"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
 output:
   html_document:
     toc: true
@@ -17,46 +16,24 @@ params:
 ---
 
 
-```{r}
-library(ggplot2)
-library(tidyr)
-library(ComplexHeatmap)
-
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(ggplot2)
+    library(tidyr)
+})
 
 options(bitmapType="cairo")
-## library(showtext) ; showtext_auto()
-
 ```
 
 
-```{r}
-args <- list(input_files_mapping = params$input_files_mapping,
-             wd = params$outputs_directory,
-             out_csv = file.path(params$outputs_directory, 'metrics.csv'))
-
-## write(getwd(), stderr())
-## write(args$input_files_mapping, stderr())
-## write(args$wd, stderr())
-setwd(args$wd)
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+args <- list(input_files_mapping = params$input_files_mapping, wd = params$outputs_directory)
 ```
 
-
-
-## Clustbench metrics
-
-We'll have to read both metrics and param files. Let's do a dirty direct translation of [the python implementation](https://github.com/omnibenchmark/omnibenchmark/pull/45/files#diff-61e6034e7438befed44f7303987c35f814bdfee939eb70186b48dbe2fe1182c8)?
-
-
-
-```{r}
-## def tokenize(file_path: str):
-##     ## we get only after the 'out' directory
-##     fp = file_path.split("out/")[1].split("/")
-##     ## and slice in stage/method/params triples
-##     return [x for x in zip(*(iter(fp),) * 3)]
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 tokenize <- function(fn, out = 'out') {
-    ## fn <- file.path(out, fn)
     fp = strsplit(strsplit(fn, split = 'out/')[[1]][2], split = '/')[[1]]
     i <- 1
     res <- list()
@@ -66,26 +43,6 @@ tokenize <- function(fn, out = 'out') {
     }
     return(res)
 }
-
-## def read_params(file_path: str):
-##     triples = tokenize(file_path)
-##     params_path = ""
-##     res = ""
-##     parent = "out"
-##     for triple in triples:
-##         parent = op.join(parent, triple[0], triple[1], triple[2])
-##         if not "default" in triple[2]:
-##             param_file_path = op.join(parent, "parameters.txt")
-##             with open(param_file_path) as fh:
-##                 reader = csv.reader(fh, delimiter="\t")
-##                 for row in reader:
-##                     res = "%s %s %s %s %s;" % (
-##                         res,
-##                         triple[0],
-##                         triple[1],
-##                         triple[2],
-##                         row[0].strip(),
-##                     )
 
 read_params <- function(file_path, out = 'out') {
     triples <- tokenize(file_path) 
@@ -97,8 +54,6 @@ read_params <- function(file_path, out = 'out') {
         parent = file.path(parent, triple[1], triple[2], triple[3])
         if (triple[3] != "default"){
             param_file_path <- file.path(parent, "parameters.txt")
-            ## caution param files lack EOL
-            ## write(paste('param file is', param_file_path), stderr())
             params <- readLines(param_file_path, warn = FALSE)
             res[[i]] <- c(triple[1], triple[2], triple[3], params)
         }
@@ -108,25 +63,21 @@ read_params <- function(file_path, out = 'out') {
 ```
 
 
-```{r read_metrics}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 d <- list()
 
 metrics_files <- read.table(args$input_files_mapping, header = FALSE)$V1
 
 for (fn in metrics_files){
-    ## write(paste('fn is ', fn), stderr())
     d[[fn]] <- list(
         run = read_params(out = args$wd, file_path = fn),    
-        metrics = read.csv(fn, header = TRUE))
+        metrics = read.csv(fn, header = TRUE)
+    )
 }
-
-str(d[1:3])
 ```
 
-To plot the data we tabulate them first:
-
-```{r}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 ## slot 1: data
 ## slot 2: next, typically method
 ## slot 3: typically metric
@@ -148,15 +99,69 @@ fd <- do.call(rbind.data.frame,
 fd$file <- rownames(fd)
 rownames(fd) <- 1:nrow(fd)
 colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', 'file')
-dim(fd)
 ```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+csv <- fd |>
+    dplyr::select(!contains("file")) |>
+    distinct() |> 
+    mutate(metric = sub("']", "", 
+                        sub("['--metric'\n '", "", metric, fixed = TRUE), fixed = TRUE)) |>
+    mutate(method = sub("'.*", "", sub("['--linkage'\n '", "", 
+                        sub("['--method'\n '", "", method, fixed = TRUE), 
+                        fixed = TRUE))) |>
+    mutate(datagen = sub("'.*", "", sub("['--dataset_generator'\n '", "", data, fixed = TRUE)),
+           dataname = sub("']", "", sub("'\n '", "", sub(".*--dataset_name", "", data), fixed = TRUE),
+                          fixed = TRUE)) |>
+    mutate(data = paste0(datagen, "_", dataname))
+```
+
+# Summary stats
 
 ```{r}
-write.csv(fd, file = args$out_csv)
+# Total number of distinct datasets, methods and metrics
+csv |> 
+    summarize(nDatasets = length(unique(data)),
+              nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of methods and metrics per dataset
+csv |> 
+    group_by(data) |>
+    summarize(nMethods = length(unique(method)),
+              nMetrics = length(unique(metric)))
+
+# Number of metrics and datasets for each method
+csv |> 
+    group_by(method) |>
+    summarize(nDatasets = length(unique(data)),
+              nMetrics = length(unique(metric)))
+
+```
+
+# Make plots
+
+```{r}
+#| fig.width: 10
+#| fig.height: 7
+#| warning: false
+
+csvlong <- csv |> 
+    pivot_longer(names_to = "k", values_to = "value", c("k-2", "k-1", "k", "k+1", "k+2")) |>
+    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
+    mutate(k = factor(k, levels = c("k-2", "k-1", "k", "k+1", "k+2")))
+
+ggplot(csvlong |> filter(k %in% c("k-1", "k", "k+1")), aes(x = k, y = value)) + 
+    geom_line(color = "lightgrey", aes(group = paste0(method, data))) + 
+    geom_point(aes(color = data)) + 
+    geom_violin(fill = "transparent") + 
+    facet_wrap(~ metric, scales = "free_y") + 
+    theme_classic() + 
+    theme(legend.position = "none")
 ```
 
 
-## Trace
+# Trace
 
 ```{r}
 sessionInfo()
