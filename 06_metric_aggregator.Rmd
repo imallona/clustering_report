@@ -25,6 +25,7 @@ suppressPackageStartupMessages({
     library(dplyr)
     library(ggplot2)
     library(tidyr)
+    library(patchwork)
 })
 ```
 
@@ -195,41 +196,71 @@ csv_conda |>
 #| fig.height: 7
 #| warning: false
 
+
+compute_pairwise_diff <- function(csv) {
+  pairwise_csv <- csv %>%
+    group_by(method, stack) %>%
+    summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+    pivot_wider(names_from = stack, values_from = value) %>%
+    mutate(diff = Conda - Apptainer)
+  
+  return(pairwise_csv)
+}
+
 csvlong_combined <- bind_rows(csvlong_conda, csvlong_apptainer)
+csvlong_combined_ari <- csvlong_combined |> filter(k == "k", metric == "adjusted_rand_score")
+csvlong_combined_ari_diff <- compute_pairwise_diff(csvlong_combined_ari)
+
+annotations <- csvlong_combined_ari_diff %>%
+  select(method, diff) %>%
+  mutate(label = sprintf("d = %.3f", diff))
+
 
 # One plot for combined on all datasets
-p <- ggplot(csvlong_combined |> filter(k == "k"), aes(x = stack, y = value, fill = stack)) + 
+p <- ggplot(csvlong_combined_ari, aes(x = stack, y = value, fill = stack)) + 
     geom_violin(alpha = 0.4) +  # Make violins slightly transparent
     geom_boxplot(width = 0.15, outlier.shape = NA, color = "black", alpha = 0.7) +  # Add boxplot
     # geom_jitter(width = 0.1, size = 1.5, aes(color = stack), alpha = 0.7) +
     # facet_grid(data ~ metric, scales = "free_y") +
-    facet_wrap(~ metric, scales = "free_y") + 
+    facet_wrap(~ method, scales = "free_y") + 
     scale_fill_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
     scale_color_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
     theme_classic() +
-    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1)) +
+    geom_text(data = annotations, aes(x = 1.5, y = max(csvlong_combined_ari$value, na.rm = TRUE) * 1.15, label = label), inherit.aes = FALSE, size = 4) +  
+    ggtitle(paste("Comparison for Metric: adjusted_rand_score"))
   
-ggsave(filename = paste0("plots/plot_all_datasets.png"), plot = p, width = 12, height = 7, dpi = 300)
+ggsave(filename = paste0("plots/metrics/plot_adjusted_rand_score.png"), plot = p, width = 12, height = 7, dpi = 300)
 print(p)
 
 
 # Filter unique datasets
-datasets <- unique(csvlong_combined$data)
-for (dataset in datasets) {
-  p <- ggplot(csvlong_combined |> filter(data == dataset, k == "k"), aes(x = stack, y = value, fill = stack)) + 
+metrics <- unique(csvlong_combined$metric)
+for (m in metrics) {
+  csvlong_combined_metric <- csvlong_combined |> filter(k == "k", metric == m)
+  csvlong_combined_metric_diff <- compute_pairwise_diff(csvlong_combined_metric)
+  
+  annotations_metric <- csvlong_combined_metric_diff %>%
+    select(method, diff) %>%
+    mutate(label = sprintf("d = %.3f", diff))
+  
+  p <- ggplot(csvlong_combined_metric, aes(x = stack, y = value, fill = stack)) + 
     geom_violin(alpha = 0.4) +  # Make violins slightly transparent
     geom_boxplot(width = 0.15, outlier.shape = NA, color = "black", alpha = 0.7) +  # Add boxplot
     # geom_jitter(width = 0.1, size = 1.5, aes(color = stack), alpha = 0.7) +
     # facet_grid(data ~ metric, scales = "free_y") +
-    facet_wrap(~ metric, scales = "free_y") + 
+    facet_wrap(~ method, scales = "free_y") + 
     scale_fill_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
     scale_color_manual(values = c("Conda" = "#1b9e77", "Apptainer" = "#d95f02")) +  
     theme_classic() +
-    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))  +  
-    ggtitle(paste("Comparison for Dataset: ", dataset))
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1)) +
+    geom_text(data = annotations_metric, aes(x = 1.5, y = max(csvlong_combined_metric$value, na.rm = TRUE) * 1.15, label = label), inherit.aes = FALSE, size = 4) +  
+    ggtitle(paste("Comparison for Metric: ", m))
   
-  ggsave(filename = paste0("plots/plot_", dataset, ".png"), plot = p, width = 12, height = 7, dpi = 300)
+  ggsave(filename = paste0("plots/metrics/plot_", m, ".png"), plot = p, width = 12, height = 7, dpi = 300)
   print(p)
+  
+  print(annotations_metric[annotations_metric$diff != 0, ])
 }
 ```
 
