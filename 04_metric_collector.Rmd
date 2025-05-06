@@ -21,6 +21,7 @@ suppressPackageStartupMessages({
     library(dplyr)
     library(ggplot2)
     library(tidyr)
+    library(jsonlite)
 })
 
 options(bitmapType="cairo")
@@ -53,8 +54,8 @@ read_params <- function(file_path, out = 'out') {
         triple <- triples[[i]]
         parent = file.path(parent, triple[1], triple[2], triple[3])
         if (triple[3] != "default"){
-            param_file_path <- file.path(parent, "parameters.txt")
-            params <- readLines(param_file_path, warn = FALSE)
+            param_file_path <- file.path(parent, "parameters.json")
+            params <- fromJSON(param_file_path)
             res[[i]] <- c(triple[1], triple[2], triple[3], params)
         }
     }

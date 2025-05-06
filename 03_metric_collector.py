@@ -47,7 +47,6 @@ def main():
     with open(op.join(output_dir, 'inputs.txt'), 'w') as fh:
         fh.write("\n".join(map(str, files)))
 
-    print(output_dir)
     process(output_dir = output_dir,
             metrics_metafile = op.join(output_dir, 'inputs.txt'),
             report_basename = 'plotting_report.html')
