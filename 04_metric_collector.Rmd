@@ -71,10 +71,14 @@ d <- list()
 metrics_files <- read.table(args$input_files_mapping, header = FALSE)$V1
 
 for (fn in metrics_files){
-    d[[fn]] <- list(
-        run = read_params(out = args$wd, file_path = fn),    
-        metrics = read.csv(fn, header = TRUE)
-    )
+    if (file.size(fn) > 0) {
+        d[[fn]] <- list(
+            run = read_params(out = args$wd, file_path = fn),
+            metrics = read.csv(fn, header = TRUE)
+        )
+    } else {
+        message(sprintf("Skipping empty file: %s", fn))
+    }
 }
 ```
 
