@@ -32,20 +32,23 @@ options(bitmapType="cairo")
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
-# args <- list(input_files_mapping = params$input_files_mapping, wd = params$outputs_directory)
+# args <- list(input_files_mapping = params$input_files_mapping, 
+#              wd = params$outputs_directory)
+
+args <- list(wd = params$outputs_directory)
 
 # MR - for testing
-args <- list()
+# args <- list()
 # args$input_files_mapping <- "inputs.txt"
-args$wd <- "../clustering_example/out"
+# args$wd <- "../clustering_example/out"
 # out.csv"
 
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
-tokenize <- function(fn, out = 'out') {
-    fp = strsplit(strsplit(fn, split = 'out/')[[1]][2], split = '/')[[1]]
+tokenize <- function(fn, out_dir_stub = 'out/') {
+    fp = strsplit(strsplit(fn, split = out_dir_stub)[[1]][2], split = '/')[[1]]
     i <- 1
     res <- list()
     while (i < length(fp)) {
@@ -55,12 +58,12 @@ tokenize <- function(fn, out = 'out') {
     return(res)
 }
 
-read_params <- function(file_path, out = 'out') {
+read_params <- function(file_path, stub = 'out') {
     triples <- tokenize(file_path) 
     # print(triples)
     params_path = ""
     res <- list()
-    parent <- out
+    parent <- stub
     for (i in 1:length(triples)){
         triple <- triples[[i]]
         parent = file.path(parent, triple[1], triple[2], triple[3])
