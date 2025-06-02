@@ -201,7 +201,7 @@ dn <- dimnames(mdm_tab)
 unique(missing[,c("method","data")])
 
 
-saveRDS(csv, "metrics-results.rds")
+saveRDS(csv, file.path(args$wd, "metrics-results.rds"))
 
 ```
 
@@ -295,7 +295,7 @@ ggplot(mds_df %>% filter(!is.na(max_rss)),
   facet_wrap(~method, drop = TRUE)
 
 
-saveRDS(mds_df, "performance-results.rds")
+saveRDS(mds_df, file.path(args$wd, "performance-results.rds"))
 
 
 ```
