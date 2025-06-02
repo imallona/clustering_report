@@ -95,7 +95,7 @@ head(metrics_files, 2)
 
 for (fn in metrics_files){
     d[[fn]] <- list(
-        run = read_params(out = args$wd, file_path = fn),    
+        run = read_params(stub = args$wd, file_path = fn),    
         metrics = read.csv(fn, header = TRUE)
     )
 }
@@ -247,7 +247,7 @@ head(perm_files, 2)
 
 for (fn in perm_files){
     d[[fn]] <- list(
-        run = read_params(out = args$wd, file_path = fn),    
+        run = read_params(stub = args$wd, file_path = fn),    
         metrics = read.table(fn, header = TRUE)
     )
 }
