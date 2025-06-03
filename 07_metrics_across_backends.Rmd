@@ -63,6 +63,8 @@ opts_chunk$set(fig.width = 6,
 
 ```{r, results = 'asis'}
 
+res <- list()
+
 for (run1 in runs) {
     cat('## ', run1, '{.tabset .tabset-pills} \n\n')
     
@@ -101,28 +103,42 @@ for (run1 in runs) {
                facet_wrap(~method, scales = "free") +
                theme(aspect.ratio=1))
 
-        print(ggplot(df,
-                     aes(y=.data[[paste0('k', r1.id)]] - .data[[paste0('k', r2.id)]],
-                         x=method,
-                         colour = method)) +
-              geom_point(size = 3) +
-              geom_abline() +
-              theme(legend.position = "bottom") +
-              facet_wrap(~metric, scales = "free") +
-              theme(aspect.ratio=1))
+        ## print(ggplot(df,
+        ##              aes(y=.data[[paste0('k', r1.id)]] - .data[[paste0('k', r2.id)]],
+        ##                  x=method,
+        ##                  colour = method)) +
+        ##       geom_point(size = 3) +
+        ##       geom_abline() +
+        ##       theme(legend.position = "bottom") +
+        ##       facet_wrap(~metric, scales = "free") +
+        ##       theme(aspect.ratio=1))
 
 
-        print(ggplot(df, aes(y=.data[[paste0('k', r1.id)]] - .data[[paste0('k', r2.id)]],
-                             x=data,
-                             colour = data)) +
-              geom_point(size = 3) +
-              geom_abline() +
-              theme(legend.position = "bottom") +
-              facet_wrap(~metric, scales = "free") +
-              theme(aspect.ratio=1))
+        ## print(ggplot(df, aes(y=.data[[paste0('k', r1.id)]] - .data[[paste0('k', r2.id)]],
+        ##                      x=data,
+        ##                      colour = data)) +
+        ##       geom_point(size = 3) +
+        ##       geom_abline() +
+        ##       theme(legend.position = "bottom") +
+        ##       facet_wrap(~metric, scales = "free") +
+        ##       theme(aspect.ratio=1))
 
+        res[[paste(r1.id, r2.id)]] <- c(r1.id, r2.id, cor(r1$k, r2$k))
         cat('\n\n')
     }
 }
+
+```
+
+Export correlations at true `k`.
+
+```{r}
+res <- do.call(rbind.data.frame, res)
+colnames(res) <- c('id1', 'id2', 'cor_at_true_k')
+res$cor_at_true_k <- as.numeric(res$cor_at_true_k)
+
+print(res)
+
+write.csv(file = '07_metrics_across_backends__metrics_correlation.csv', res, row.names = FALSE)
 
 ```
