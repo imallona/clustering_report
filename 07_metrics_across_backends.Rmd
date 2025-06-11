@@ -54,8 +54,6 @@ opts_chunk$set(fig.width = 6,
 ##                clustering_dir =  "/home/imallona/src/clustering_example")
 
 (runs <- list.files(pattern = params$metrics_bn, path = params$clustering_dir, recursive = TRUE))
-
-
 ```
 
 
@@ -67,15 +65,15 @@ res <- list()
 
 for (run1 in runs) {
     cat('## ', run1, '{.tabset .tabset-pills} \n\n')
+
+    r1 <- readRDS(file.path(params$clustering_dir, run1))
+    r1.id <- dirname(paste0(".", run1))
     
     for (run2 in setdiff(runs, run1)) {
         
         cat('### ', run2, '\n\n')
     
-        r1 <- readRDS(file.path(params$clustering_dir, run1))
         r2 <- readRDS(file.path(params$clustering_dir, run2))
-
-        r1.id <- dirname(paste0(".", run1))
         r2.id <- dirname(paste0(".", run2))
         
         df <- r1 %>% select(data, method, metric, k) %>% 
@@ -92,7 +90,6 @@ for (run1 in runs) {
               facet_wrap(~metric, scales = "free") +
               theme(aspect.ratio=1))
 
-        
         print( ggplot(df, aes(x=.data[[paste0('k', r1.id)]],
                               y=.data[[paste0('k', r2.id)]],
                               colour = data,
@@ -113,7 +110,6 @@ for (run1 in runs) {
         ##       facet_wrap(~metric, scales = "free") +
         ##       theme(aspect.ratio=1))
 
-
         ## print(ggplot(df, aes(y=.data[[paste0('k', r1.id)]] - .data[[paste0('k', r2.id)]],
         ##                      x=data,
         ##                      colour = data)) +
@@ -124,11 +120,30 @@ for (run1 in runs) {
         ##       theme(aspect.ratio=1))
 
         res[[paste(r1.id, r2.id)]] <- c(r1.id, r2.id, cor(r1$k, r2$k))
+
         cat('\n\n')
     }
+
+    cat('### Internal check\n')
+    
+    ## additional check (idea from Ben): are repeated ks consistent within method:dataset runs?
+    ## fcps-atom has a cardinality of 2, so k-1, k-2 etc should match true k (metrics results)
+    atom <- r1[r1$data == 'fcps|atom',]
+    atom$identical_true_m1 <- atom$k == atom$`k-1`
+    atom$identical_true_m2 <- atom$k == atom$`k-2`
+    odd <- atom[(!atom$identical_true_m1 | !atom$identical_true_m2),]
+    if (nrow(odd) > 0) {
+        print(odd[,c('method', 'metric', 'k-2', 'k-1', 'k', 'identical_true_m1', 'identical_true_m2')])
+    } else {
+        print ('are consistent')
+    }
+
+    
 }
 
 ```
+
+## Export
 
 Export correlations at true `k`.
 
