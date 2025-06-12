@@ -54,6 +54,7 @@ opts_chunk$set(fig.width = 6,
 ##                clustering_dir =  "/home/imallona/src/clustering_example")
 
 (runs <- list.files(pattern = params$metrics_bn, path = params$clustering_dir, recursive = TRUE))
+## runs <- runs[2:5]
 ```
 
 
@@ -133,17 +134,16 @@ for (run1 in runs) {
     atom$identical_true_m2 <- atom$k == atom$`k-2`
     odd <- atom[(!atom$identical_true_m1 | !atom$identical_true_m2),]
     if (nrow(odd) > 0) {
-        print(odd[,c('method', 'metric', 'k-2', 'k-1', 'k', 'identical_true_m1', 'identical_true_m2')])
+        cat('inconsistent indeed\n\n')
+        print(kable(odd[,c('method', 'metric', 'k-2', 'k-1', 'k', 'identical_true_m1', 'identical_true_m2')], "html"))
     } else {
-        print ('are consistent')
+        print('redundant ks consistency check passed - identical for atom')
     }
-
-    
 }
 
 ```
 
-## Export
+# Export
 
 Export correlations at true `k`.
 
