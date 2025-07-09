@@ -13,6 +13,8 @@ output:
 params:
   input_files_mapping: ''
   outputs_directory: ''
+editor_options: 
+  chunk_output_type: console
 ---
 
 
@@ -29,13 +31,24 @@ options(bitmapType="cairo")
 
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-args <- list(input_files_mapping = params$input_files_mapping, wd = params$outputs_directory)
+
+# args <- list(input_files_mapping = params$input_files_mapping, 
+#              wd = params$outputs_directory)
+
+args <- list(wd = params$outputs_directory)
+
+# MR - for testing
+# args <- list()
+# args$input_files_mapping <- "inputs.txt"
+# args$wd <- "../clustering_example/out"
+# out.csv"
+
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
-tokenize <- function(fn, out = 'out') {
-    fp = strsplit(strsplit(fn, split = 'out/')[[1]][2], split = '/')[[1]]
+tokenize <- function(fn, out_dir_stub = 'out/') {
+    fp = strsplit(strsplit(fn, split = out_dir_stub)[[1]][2], split = '/')[[1]]
     i <- 1
     res <- list()
     while (i < length(fp)) {
@@ -45,40 +58,46 @@ tokenize <- function(fn, out = 'out') {
     return(res)
 }
 
-read_params <- function(file_path, out = 'out') {
+read_params <- function(file_path, stub = 'out') {
     triples <- tokenize(file_path) 
+    # print(triples)
     params_path = ""
     res <- list()
-    parent <- out
+    parent <- stub
     for (i in 1:length(triples)){
         triple <- triples[[i]]
         parent = file.path(parent, triple[1], triple[2], triple[3])
         if (triple[3] != "default"){
             param_file_path <- file.path(parent, "parameters.json")
+            #cat(param_file_path, "\n")
             params <- fromJSON(param_file_path)
             res[[i]] <- c(triple[1], triple[2], triple[3], params)
         }
     }
     return(res)
 }
+
 ```
 
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 d <- list()
+#metrics_files <- read.table(args$input_files_mapping, header = FALSE)$V1
 
-metrics_files <- read.table(args$input_files_mapping, header = FALSE)$V1
+z <- list.files(path = args$wd, pattern = "clustbench.scores.gz",
+                recursive = TRUE, all.files = TRUE, full.names = TRUE)
+ss <- strsplit(z, "/", fixed = TRUE)
+nchars <- lapply(ss, nchar)
+num_hashes <- sapply(nchars, function(u) sum(u==65))
+metrics_files <- z[num_hashes==0]
+head(metrics_files, 2)
 
 for (fn in metrics_files){
-    if (file.size(fn) > 0) {
-        d[[fn]] <- list(
-            run = read_params(out = args$wd, file_path = fn),
-            metrics = read.csv(fn, header = TRUE)
-        )
-    } else {
-        message(sprintf("Skipping empty file: %s", fn))
-    }
+    d[[fn]] <- list(
+        run = read_params(stub = args$wd, file_path = fn),    
+        metrics = read.csv(fn, header = TRUE)
+    )
 }
 ```
 
@@ -87,38 +106,50 @@ for (fn in metrics_files){
 ## slot 2: next, typically method
 ## slot 3: typically metric
 prettify_run <- function(x, slot) {
-    ## 1 would be the stage, #2 the module name and ## 3 the param_x encoding, so discarding most
+    ## 1 would be the stage, #2 the module name and 
+    ## 3 the param_x encoding, so discarding most
+  if(slot==1) {
+    return(gsub(',', '\n', paste0(x$run[[slot]][4], "|",
+                                  x$run[[slot]][5])))
+  } else if(slot==2) {
+    return(gsub(',', '\n', paste0(x$run[[slot]][2], 
+                                  "|", x$run[[slot]][3])))
+  } else {
     return(gsub(',', '\n', x$run[[slot]][4]))
+  }
 }
 
 
-fd <- do.call(rbind.data.frame,
-              lapply(d, function(x) {
-                  run_fd <- data.frame(metric = prettify_run(x, 3),
-                                       method = prettify_run(x, 2),
-                                       data =   prettify_run(x, 1))
-                  fd <- cbind(run_fd, unname(x$metrics))
-                  return(fd)
-              })
-              )
+ds <- lapply(d, function(x) {
+  run_fd <- data.frame(metric = prettify_run(x, 3),
+                       method = prettify_run(x, 2),
+                       data =   prettify_run(x, 1))
+  cbind(run_fd, unname(x$metrics))
+})
+              
+fd <- do.call(rbind.data.frame, ds)
 fd$file <- rownames(fd)
 rownames(fd) <- 1:nrow(fd)
 colnames(fd) <- c('metric', 'method', 'data', 'k-2', 'k-1', 'k', 'k+1', 'k+2', 'file')
 ```
 
+
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-csv <- fd |>
-    dplyr::select(!contains("file")) |>
-    distinct() |> 
-    mutate(metric = sub("']", "", 
-                        sub("['--metric'\n '", "", metric, fixed = TRUE), fixed = TRUE)) |>
-    mutate(method = sub("'.*", "", sub("['--linkage'\n '", "", 
-                        sub("['--method'\n '", "", method, fixed = TRUE), 
-                        fixed = TRUE))) |>
-    mutate(datagen = sub("'.*", "", sub("['--dataset_generator'\n '", "", data, fixed = TRUE)),
-           dataname = sub("']", "", sub("'\n '", "", sub(".*--dataset_name", "", data), fixed = TRUE),
-                          fixed = TRUE)) |>
-    mutate(data = paste0(datagen, "_", dataname))
+# csv <- fd |>
+#     dplyr::select(!contains("file")) |>
+#     distinct() |> 
+#     mutate(metric = sub("']", "", 
+#                         sub("['--metric'\n '", "", metric, fixed = TRUE), fixed = TRUE)) |>
+#     mutate(method = sub("'.*", "", sub("['--linkage'\n '", "", 
+#                         sub("['--method'\n '", "", method, fixed = TRUE), 
+#                         fixed = TRUE))) |>
+#     mutate(datagen = sub("'.*", "", sub("['--dataset_generator'\n '", "", data, fixed = TRUE)),
+#            dataname = sub("']", "", sub("'\n '", "", sub(".*--dataset_name", "", data), fixed = TRUE),
+#                           fixed = TRUE)) |>
+#     mutate(data = paste0(datagen, "_", dataname))
+
+csv <- fd
+
 ```
 
 # Summary stats
@@ -134,15 +165,47 @@ csv |>
 csv |> 
     group_by(data) |>
     summarize(nMethods = length(unique(method)),
-              nMetrics = length(unique(metric)))
+              nMetrics = length(unique(metric))) %>% 
+  arrange(nMethods) %>% print(n = Inf)
 
 # Number of metrics and datasets for each method
 csv |> 
     group_by(method) |>
     summarize(nDatasets = length(unique(data)),
-              nMetrics = length(unique(metric)))
+              nMetrics = length(unique(metric))) %>%
+  arrange(nDatasets) %>% print(n = Inf)
+
+
+csv |> 
+    summarize(nDatasets = length(unique(data)),
+              nMethods = length(unique(method)),
+              nMetrics = length(unique(metric))) %>% prod  -> n_combinations
+
+csv %>% group_by(metric, method, data) %>% tally() %>% pull(n) %>% table()
+
+csv %>% select(metric, method, data) %>% unique() %>% nrow() -> n_computed
+
+n_computed / n_combinations
+
+n_combinations-n_computed
+
+
+mdm_tab <- table(csv$data, csv$method, csv$metric)
+w <- which(mdm_tab < 1, arr.ind = TRUE)
+dn <- dimnames(mdm_tab)
+
+(missing <- data.frame(data = dn[[1]][w[,1]],
+                       method = dn[[2]][w[,2]],
+                       metric = dn[[3]][w[,3]]))
+
+unique(missing[,c("method","data")])
+
+
+saveRDS(csv, file.path(args$wd, "metrics-results.rds"))
 
 ```
+
+
 
 # Make plots
 
@@ -152,17 +215,89 @@ csv |>
 #| warning: false
 
 csvlong <- csv |> 
-    pivot_longer(names_to = "k", values_to = "value", c("k-2", "k-1", "k", "k+1", "k+2")) |>
-    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
+    pivot_longer(names_to = "k", values_to = "value", 
+                 c("k-2", "k-1", "k", "k+1", "k+2")) |>
+    mutate(k = c(k.2 = "k-2", k.1 = "k-1", k = "k", 
+                 k.1.1 = "k+1", k.2.1 = "k+2")[k]) |> 
     mutate(k = factor(k, levels = c("k-2", "k-1", "k", "k+1", "k+2")))
 
 ggplot(csvlong |> filter(k %in% c("k-1", "k", "k+1")), aes(x = k, y = value)) + 
-    geom_line(color = "lightgrey", aes(group = paste0(method, data))) + 
-    geom_point(aes(color = data)) + 
+    geom_line(color = "lightgrey", aes(group = paste0(data))) + 
+    geom_jitter(aes(color = data)) + 
     geom_violin(fill = "transparent") + 
     facet_wrap(~ metric, scales = "free_y") + 
     theme_classic() + 
     theme(legend.position = "none")
+```
+
+
+## Computing performance
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+d <- list()
+
+z <- list.files(path = args$wd, pattern = "clustbench_performance.txt",
+                recursive = TRUE, all.files = TRUE, full.names = TRUE)
+ss <- strsplit(z, "/", fixed = TRUE)
+nchars <- lapply(ss, nchar)
+num_hashes <- sapply(nchars, function(u) sum(u==65))
+perm_files <- z[num_hashes==0]
+head(perm_files, 2)
+
+for (fn in perm_files){
+    d[[fn]] <- list(
+        run = read_params(stub = args$wd, file_path = fn),    
+        metrics = read.table(fn, header = TRUE)
+    )
+}
+
+
+run_lengths <- sapply(d, function(u) length(u$run))
+table(run_lengths)
+
+md <- d[run_lengths==2] # methods crossed with datasets
+
+
+mds_df <- lapply(md, function(x) {
+  run_fd <- data.frame(data =   prettify_run(x, 1),
+                       method = prettify_run(x, 2))
+  df <- cbind(run_fd, unname(x$metrics))
+  colnames(df)[3:ncol(df)] <- c("seconds", "h.m.s", "max_rss", 
+                                "max_vms", "max_uss", "max_pss",
+                                "io_in","io_out",
+                                "mean_load","cpu_time")
+  
+  
+  df
+}) %>% bind_rows()
+     
+
+
+ggplot(mds_df, aes(x=method, y=seconds)) + 
+  geom_point() + 
+  facet_wrap(~data, scales = "free_y") + 
+  scale_y_sqrt()
+
+
+ggplot(mds_df %>% filter(!is.na(max_rss)), 
+       aes(x=seconds, y=max_rss, colour = method)) + 
+  geom_point(size = 3) + 
+  scale_x_log10() +
+  scale_y_log10()
+
+
+ggplot(mds_df %>% filter(!is.na(max_rss)), 
+       aes(x=seconds, y=io_out, colour = method)) + 
+  geom_point(size = 2) + 
+  scale_x_log10() +
+  scale_y_sqrt() +
+  facet_wrap(~method, drop = TRUE)
+
+
+saveRDS(mds_df, file.path(args$wd, "performance-results.rds"))
+
+
 ```
 
 
